@@ -102,40 +102,11 @@ def _fetch_by_pks(
     return pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
 
 
-def _fetch_sample(
-    conn: pyodbc.Connection,
-    object_name: str,
-    condition: str | None,
-    pk_cols: list[str],
-    other_pk_df: pd.DataFrame,
-    sample_size: int,
-    side: str,
-) -> list[dict]:
-    """
-    Fetches rows that exist on `side` but are missing from the other side.
-    Uses an anti-join approach: fetches a small sample for the report.
-    For very large tables the NOT EXISTS query can be expensive — we apply
-    a FETCH FIRST limit so the database does not scan beyond what we need.
-    """
-    pk_list_str = ", ".join(pk_cols)
-
-    base = f"SELECT * FROM {object_name}"
-    cond_clause = f" WHERE {condition}" if condition else ""
-
-    # SELECT TOP N works on both Teradata and SQL Server/Fabric
-    sql = f"SELECT TOP {sample_size} * FROM {object_name}{cond_clause}"
-
-    cursor = conn.cursor()
-    try:
-        cursor.execute(sql)
-        col_names = [d[0].upper() for d in cursor.description]
-        rows = cursor.fetchall()
-    finally:
-        cursor.close()
-
+def _df_to_records(df: pd.DataFrame) -> list[dict]:
+    """Converts a DataFrame to a list of plain Python dicts for JSON serialisation."""
     return [
-        {col: _val(row[i]) for i, col in enumerate(col_names)}
-        for row in rows
+        {col: _val(v) for col, v in row.items()}
+        for _, row in df.iterrows()
     ]
 
 
@@ -165,8 +136,10 @@ def run(
     chunk_size  = cfg["performance"]["chunk_size"]
     run_id      = cfg["meta"]["run_id"]
 
-    stats       = level1_result.get("statistics", {})
-    diff_pk_list = level1_result.get("_diff_pk_list", [])
+    stats              = level1_result.get("statistics", {})
+    diff_pk_list       = level1_result.get("_diff_pk_list", [])
+    left_only_pk_list  = level1_result.get("_left_only_pk_list", [])
+    right_only_pk_list = level1_result.get("_right_only_pk_list", [])
 
     logger.info("[%s] Deep diff — %s differing PKs to resolve", run_id, f"{len(diff_pk_list):,}")
 
@@ -210,26 +183,30 @@ def run(
                     "fields": fields,
                 })
 
-    # ── C. Sample left-only / right-only rows ─────────────────────────────────
+    # ── C. Fetch left-only / right-only rows using exact PKs from Level 1 ───────
     left_only_count  = stats.get("left_unique",  0)
     right_only_count = stats.get("right_unique", 0)
 
     left_only: list[dict] = []
     right_only: list[dict] = []
 
-    if left_only_count > 0:
-        logger.info("[%s] Fetching left-only sample (%s total)...",
-                    run_id, f"{left_only_count:,}")
-        left_only = _fetch_sample(
-            left_conn, left_obj, left_cond, pk_cols, right_df, sample_size, "left"
-        )
+    if left_only_count > 0 and left_only_pk_list:
+        pks_to_fetch = left_only_pk_list[:sample_size]
+        logger.info("[%s] Fetching %s left-only rows (%s total)...",
+                    run_id, f"{len(pks_to_fetch):,}", f"{left_only_count:,}")
+        df = _fetch_by_pks(left_conn, left_obj, left_cond, pk_cols, pks_to_fetch, chunk_size)
+        if not df.empty:
+            df.columns = [c.upper() for c in df.columns]
+            left_only = _df_to_records(df)
 
-    if right_only_count > 0:
-        logger.info("[%s] Fetching right-only sample (%s total)...",
-                    run_id, f"{right_only_count:,}")
-        right_only = _fetch_sample(
-            right_conn, right_obj, right_cond, pk_cols, left_df, sample_size, "right"
-        )
+    if right_only_count > 0 and right_only_pk_list:
+        pks_to_fetch = right_only_pk_list[:sample_size]
+        logger.info("[%s] Fetching %s right-only rows (%s total)...",
+                    run_id, f"{len(pks_to_fetch):,}", f"{right_only_count:,}")
+        df = _fetch_by_pks(right_conn, right_obj, right_cond, pk_cols, pks_to_fetch, chunk_size)
+        if not df.empty:
+            df.columns = [c.upper() for c in df.columns]
+            right_only = _df_to_records(df)
 
     runtime_str = _fmt_runtime(time.time() - t_start)
     logger.info("[%s] Deep diff complete — %s diff records resolved  runtime: %s",

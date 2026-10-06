@@ -205,6 +205,29 @@ def run(
         logger.info("[%s] Left-only PKs: %s  Right-only PKs: %s",
                     run_id, f"{left_unique:,}", f"{right_unique:,}")
 
+        # Collect a sample of left-only / right-only PKs for Level 2 display
+        left_only_pk_list: list[dict] = []
+        if left_unique > 0:
+            rows = con.execute(
+                f"SELECT {pk_cols_bare} FROM left_data l "
+                f"WHERE NOT EXISTS (SELECT 1 FROM right_data r WHERE {pk_join}) "
+                f"LIMIT {max_diff_pks}"
+            ).fetchall()
+            left_only_pk_list = [
+                {pk_cols[i]: row[i] for i in range(len(pk_cols))} for row in rows
+            ]
+
+        right_only_pk_list: list[dict] = []
+        if right_unique > 0:
+            rows = con.execute(
+                f"SELECT {pk_cols_bare} FROM right_data r "
+                f"WHERE NOT EXISTS (SELECT 1 FROM left_data l WHERE {pk_join}) "
+                f"LIMIT {max_diff_pks}"
+            ).fetchall()
+            right_only_pk_list = [
+                {pk_cols[i]: row[i] for i in range(len(pk_cols))} for row in rows
+            ]
+
         # ── 5. Matched PK count ───────────────────────────────────────────────
         matched_pk_records = con.execute(
             f"SELECT COUNT(*) FROM left_data l "
@@ -328,7 +351,9 @@ def run(
         "field_results":                field_results,
         "encoding_mismatches_by_field": encoding_mismatches_by_field,
         # Passed to Level 2 — not written to the final JSON report
-        "_diff_pk_list": diff_pk_list,
+        "_diff_pk_list":       diff_pk_list,
+        "_left_only_pk_list":  left_only_pk_list,
+        "_right_only_pk_list": right_only_pk_list,
     }
 
 

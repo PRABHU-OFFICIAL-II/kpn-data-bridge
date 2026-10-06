@@ -1,0 +1,17 @@
+{
+  "odbc_teradata": {
+    "type": "teradata",
+    "host_env":     "KPN_TERADATA_HOST",
+    "user_env":     "KPN_TERADATA_USER",
+    "pass_env":     "KPN_TERADATA_PASS",
+    "database_env": "KPN_TERADATA_DB"
+  },
+  "odbc_fabric": {
+    "type": "fabricsql",
+    "server_env":        "KPN_FABRIC_SERVER",
+    "database_env":      "KPN_FABRIC_DB",
+    "tenant_id_env":     "KPN_FABRIC_TENANT_ID",
+    "client_id_env":     "KPN_FABRIC_CLIENT_ID",
+    "client_secret_env": "KPN_FABRIC_CLIENT_SECRET"
+  }
+}

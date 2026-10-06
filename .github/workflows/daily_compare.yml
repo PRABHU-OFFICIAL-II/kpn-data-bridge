@@ -1,0 +1,105 @@
+name: Daily Data Comparison
+
+on:
+  # Runs every day at 06:00 UTC (adjust to match your business hours)
+  schedule:
+    - cron: "0 6 * * *"
+
+  # Also allows manual trigger from the GitHub Actions UI
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "Profile to run (e.g. kpn)"
+        required: true
+        default: "kpn"
+      workers:
+        description: "Number of parallel workers"
+        required: false
+        default: "1"
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    env:
+      # ── KPN Teradata (Source) ────────────────────────────────────
+      KPN_TERADATA_HOST:     ${{ secrets.KPN_TERADATA_HOST }}
+      KPN_TERADATA_USER:     ${{ secrets.KPN_TERADATA_USER }}
+      KPN_TERADATA_PASS:     ${{ secrets.KPN_TERADATA_PASS }}
+      KPN_TERADATA_DB:       ${{ secrets.KPN_TERADATA_DB }}
+
+      # ── KPN Microsoft Fabric (Target) ───────────────────────────
+      KPN_FABRIC_SERVER:     ${{ secrets.KPN_FABRIC_SERVER }}
+      KPN_FABRIC_DB:         ${{ secrets.KPN_FABRIC_DB }}
+      KPN_FABRIC_USER:       ${{ secrets.KPN_FABRIC_USER }}
+      KPN_FABRIC_PASS:       ${{ secrets.KPN_FABRIC_PASS }}
+      KPN_FABRIC_AUTH:       ${{ secrets.KPN_FABRIC_AUTH }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ODBC drivers
+        run: |
+          # Teradata ODBC driver
+          # Note: Replace this with the actual Teradata ODBC installation steps
+          # for your Linux runner, or use a self-hosted runner that has it pre-installed.
+          # Reference: https://downloads.teradata.com/download/connectivity/odbc-driver/linux
+
+          # Microsoft ODBC Driver 17 for SQL Server
+          curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+          curl -sSL https://packages.microsoft.com/config/ubuntu/22.04/prod.list \
+            | sudo tee /etc/apt/sources.list.d/mssql-release.list
+          sudo apt-get update
+          ACCEPT_EULA=Y sudo apt-get install -y msodbcsql17 unixodbc-dev
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run comparison
+        run: |
+          PROFILE=${{ github.event.inputs.profile || 'kpn' }}
+          WORKERS=${{ github.event.inputs.workers || '1' }}
+          python scripts/run_batch.py --profile "$PROFILE" --workers "$WORKERS"
+
+      - name: Upload reports as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comparison-reports-${{ github.run_number }}
+          path: |
+            reports/
+            ui/report_data.js
+          retention-days: 30
+
+      - name: Upload HTML dashboard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-${{ github.run_number }}
+          path: ui/
+          retention-days: 30
+
+      - name: Post summary to job
+        if: always()
+        run: |
+          # Print a quick summary from the group report to the GitHub Actions log
+          python - <<'EOF'
+          import json, glob, sys
+          files = sorted(glob.glob("reports/group-report-*.json"))
+          if not files:
+              print("No group report found.")
+              sys.exit(0)
+          with open(files[-1]) as f:
+              r = json.load(f)
+          s = r.get("summary", {})
+          print(f"Run ID  : {r.get('run_id')}")
+          print(f"Profile : {r.get('profile')}")
+          print(f"Total   : {s.get('total')}  |  OK: {s.get('ok')}  |  FAIL: {s.get('fail')}  |  ERROR: {s.get('error')}")
+          print(f"Diff Records     : {s.get('different_records')}")
+          print(f"Encoding Issues  : {s.get('encoding_mismatches')}")
+          EOF

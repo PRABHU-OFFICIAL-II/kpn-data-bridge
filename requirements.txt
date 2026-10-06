@@ -1,0 +1,6 @@
+pyodbc>=4.0.39
+teradatasql>=20.0.0
+duckdb>=0.10.0
+pandas>=2.0.0
+python-dotenv>=1.0.0
+azure-identity>=1.16.0

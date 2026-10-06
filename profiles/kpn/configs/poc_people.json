@@ -1,0 +1,30 @@
+{
+  "type": "ducky",
+  "meta": {
+    "run_id": "KPN-POC-2026-10-07",
+    "deep_diff_on_fail": true,
+    "deep_diff_engine": "deepdiff"
+  },
+  "left": {
+    "connection": "odbc_teradata",
+    "object": "c04939130.X_Table"
+  },
+  "right": {
+    "connection": "odbc_fabric",
+    "object": "dbo.POC_People"
+  },
+  "columns": {
+    "pk": ["PersonID"],
+    "excluded": []
+  },
+  "realdiff": {
+    "bisection_factor": 32,
+    "bisection_threshold": 1000,
+    "sample_size": 500
+  },
+  "performance": {
+    "chunk_size": 100000,
+    "row_limit": null,
+    "max_diff_pks": 10000
+  }
+}

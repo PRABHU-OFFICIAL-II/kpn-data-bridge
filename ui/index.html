@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Comparison Report Summary</title>
+  <style>
+    :root {
+      --bg:        #0f1117;
+      --surface:   #1a1d27;
+      --border:    #2e3147;
+      --text:      #e2e8f0;
+      --muted:     #8892a4;
+      --ok:        #22c55e;
+      --fail:      #ef4444;
+      --error:     #f97316;
+      --accent:    #6366f1;
+      --warn:      #eab308;
+      --row-hover: #232740;
+    }
+    [data-theme="light"] {
+      --bg:        #f8fafc;
+      --surface:   #ffffff;
+      --border:    #e2e8f0;
+      --text:      #0f172a;
+      --muted:     #64748b;
+      --row-hover: #f1f5f9;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { font-size: 18px; font-weight: 600; letter-spacing: 0.3px; }
+    header .meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+    .theme-btn {
+      background: var(--border);
+      border: none;
+      color: var(--text);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    main { padding: 28px 32px; }
+
+    /* ── Summary tiles ─────────────────────────────────────────── */
+    .tiles {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .tile {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+    .tile .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+    .tile .value { font-size: 26px; font-weight: 700; margin-top: 6px; }
+    .tile.ok    .value { color: var(--ok); }
+    .tile.fail  .value { color: var(--fail); }
+    .tile.error .value { color: var(--error); }
+
+    /* ── Analysis Guide card ───────────────────────────────────── */
+    .guide-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 28px;
+      overflow: hidden;
+    }
+    .guide-header {
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 1px solid var(--border);
+    }
+    .guide-header:hover { background: var(--row-hover); }
+    .guide-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .guide-toggle {
+      font-size: 11px;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .guide-body { display: none; padding: 20px 22px; }
+    .guide-body.open { display: block; }
+    .guide-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 14px;
+    }
+    .guide-item {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .guide-item-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .guide-tag {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    .tag-red    { background: rgba(239,68,68,0.15);   color: var(--fail);   }
+    .tag-orange { background: rgba(249,115,22,0.15);  color: var(--error);  }
+    .tag-yellow { background: rgba(234,179,8,0.15);   color: var(--warn);   }
+    .tag-blue   { background: rgba(99,102,241,0.15);  color: var(--accent); }
+    .guide-item-title { font-size: 13px; font-weight: 600; }
+    .guide-item p { font-size: 12px; color: var(--muted); line-height: 1.6; margin-bottom: 6px; }
+    .guide-item .action {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent);
+      background: rgba(99,102,241,0.08);
+      border-radius: 4px;
+      padding: 4px 8px;
+      display: inline-block;
+      margin-top: 2px;
+    }
+
+    /* ── Table card ────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .card-title {
+      padding: 14px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--row-hover); }
+    tbody td {
+      padding: 10px 14px;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+    }
+    .badge-ok    { background: rgba(34,197,94,0.15);  color: var(--ok);    }
+    .badge-fail  { background: rgba(239,68,68,0.15);  color: var(--fail);  }
+    .badge-error { background: rgba(249,115,22,0.15); color: var(--error); }
+
+    .num { font-variant-numeric: tabular-nums; }
+    .diff-val { color: var(--fail); }
+
+    /* ── Expanded row detail ───────────────────────────────────── */
+    .detail-row td { padding: 0; cursor: default; }
+    .detail-row:hover { background: var(--surface) !important; }
+    .detail-panel {
+      padding: 16px 20px;
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+    }
+    .detail-panel h3 {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: 180px 1fr 1fr;
+      gap: 0;
+      font-size: 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+    .field-grid .gh {
+      background: var(--surface);
+      padding: 6px 12px;
+      font-weight: 600;
+      color: var(--muted);
+      font-size: 11px;
+      border-bottom: 1px solid var(--border);
+    }
+    .field-grid .gc {
+      padding: 6px 12px;
+      border-bottom: 1px solid var(--border);
+      word-break: break-all;
+    }
+    .field-grid .gc.left-val  { color: var(--fail); }
+    .field-grid .gc.right-val { color: var(--ok); }
+
+    /* Special value display */
+    .val-null    { font-style: italic; opacity: 0.6; }
+    .val-empty   { font-style: italic; opacity: 0.6; }
+    .val-space   { color: var(--warn); font-weight: 700; letter-spacing: 1px; }
+
+    .diff-records { margin-top: 12px; }
+    .diff-record {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+    .diff-record-pk {
+      padding: 7px 12px;
+      font-size: 11px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+
+    /* ── No data state ─────────────────────────────────────────── */
+    .empty {
+      text-align: center;
+      padding: 60px 0;
+      color: var(--muted);
+    }
+    .empty p { margin-top: 8px; font-size: 13px; }
+  </style>
+</head>
+<body data-theme="dark">
+
+<header>
+  <div>
+    <h1>Comparison Report Summary</h1>
+    <div class="meta" id="header-meta">Loading…</div>
+  </div>
+  <button class="theme-btn" onclick="toggleTheme()">Toggle Theme</button>
+</header>
+
+<main>
+  <div id="app">
+    <div class="empty">
+      <strong>No report data found.</strong>
+      <p>Run <code>python scripts/run_batch.py --profile &lt;name&gt;</code> to generate a report,<br>
+         then refresh this page.</p>
+    </div>
+  </div>
+</main>
+
+<!-- report_data.js is generated by reports/aggregator.py -->
+<script src="report_data.js"></script>
+<script>
+  /* ── Theme ───────────────────────────────────────────────────── */
+  function toggleTheme() {
+    const el = document.body;
+    el.dataset.theme = el.dataset.theme === 'dark' ? 'light' : 'dark';
+  }
+
+  /* ── Formatting helpers ──────────────────────────────────────── */
+  function fmt(n) {
+    if (n === undefined || n === null) return '—';
+    return Number(n).toLocaleString();
+  }
+
+  function statusBadge(status) {
+    const cls = status === 'PASS' ? 'ok' : status === 'FAIL' ? 'fail' : 'error';
+    return `<span class="badge badge-${cls}">${status}</span>`;
+  }
+
+  /**
+   * Renders a field value with visible indicators for:
+   *   null        → (null) in muted italic
+   *   ""          → (empty) in muted italic
+   *   trailing space → value shown normally + · marker per trailing space
+   */
+  function displayVal(v) {
+    if (v === null || v === undefined) {
+      return '<span class="val-null">(null)</span>';
+    }
+    const s = String(v);
+    if (s === '') {
+      return '<span class="val-empty">(empty)</span>';
+    }
+    const trimmed = s.trimEnd();
+    const trailingSpaces = s.length - trimmed.length;
+    if (trailingSpaces > 0) {
+      const dots = '<span class="val-space">' + '·'.repeat(trailingSpaces) + '</span>';
+      return escHtml(trimmed) + dots +
+             ' <span style="font-size:10px;opacity:0.5">[trailing space]</span>';
+    }
+    return escHtml(s);
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  /* ── Analysis Guide ──────────────────────────────────────────── */
+  const GUIDE_ITEMS = [
+    {
+      tag: 'Critical', tagClass: 'tag-red',
+      title: 'Missing rows — Left Unique (left_unique > 0)',
+      desc: 'Records exist in the source (Teradata) but are absent from the target (Fabric). Data was not migrated.',
+      action: 'Re-run the ETL pipeline for the affected PKs. Validate the extraction filter / WHERE clause used during migration.'
+    },
+    {
+      tag: 'Critical', tagClass: 'tag-red',
+      title: 'Phantom rows — Right Unique (right_unique > 0)',
+      desc: 'Records exist in the target (Fabric) but not in the source. May indicate unintended inserts, scope mismatch, or a different snapshot timestamp.',
+      action: 'Confirm whether these rows are expected. If not, investigate the load process for unintended data insertion.'
+    },
+    {
+      tag: 'High', tagClass: 'tag-orange',
+      title: 'Encoding mismatch (ü → u, é → e, ë → e …)',
+      desc: 'Special characters in the source appear as ASCII-degraded equivalents in the target. Classic symptom of Latin-1 / ISO-8859 → UTF-8 conversion loss during migration.',
+      action: 'Review the character set (CHARSET) setting on the Teradata export and the Fabric import. Ensure the pipeline uses UTF-8 end-to-end.'
+    },
+    {
+      tag: 'High', tagClass: 'tag-orange',
+      title: 'Field value mismatch',
+      desc: 'A column value differs between source and target for the same PK. Could be a transformation bug, rounding, truncation, or a business rule applied on only one side.',
+      action: 'Cross-check the ETL transformation logic for each flagged column. Pay attention to DECIMAL precision, date format, and type casting rules.'
+    },
+    {
+      tag: 'Medium', tagClass: 'tag-yellow',
+      title: 'NULL vs empty string',
+      desc: 'The source stores NULL but the target stores \'\' (empty string), or vice versa. Logically different values — downstream JOINs and IS NULL checks will behave differently.',
+      action: 'Align the handling in the ETL: either preserve NULLs or apply a consistent COALESCE / NULLIF transformation on both sides.'
+    },
+    {
+      tag: 'Medium', tagClass: 'tag-yellow',
+      title: 'Trailing spaces',
+      desc: 'A value has whitespace appended on one side but not the other (e.g. "6811QR·" vs "6811QR"). Invisible on screen but breaks exact-match JOINs and equality checks in downstream queries.',
+      action: 'Apply TRIM() or RTRIM() in the ETL pipeline or at the target load step. Verify the source column definition (CHAR vs VARCHAR pads with spaces).'
+    },
+    {
+      tag: 'Low', tagClass: 'tag-blue',
+      title: 'Numeric / decimal precision',
+      desc: 'Amounts differ slightly between source and target (e.g. 1250.50 vs 1205.50). Can indicate a rounding rule, currency conversion, or schema type mismatch (DECIMAL(10,2) vs FLOAT).',
+      action: 'Compare source and target column data types. Ensure DECIMAL precision and scale are identical. Avoid implicit FLOAT casting in the ETL.'
+    },
+    {
+      tag: 'Low', tagClass: 'tag-blue',
+      title: 'Row count difference only',
+      desc: 'Left and right totals differ but individual matched rows are identical. May be caused by duplicate rows, an off-by-one in the source filter, or a partial load.',
+      action: 'Check the extraction WHERE clause and any deduplication logic. Confirm whether soft-deleted rows are included or excluded on both sides.'
+    }
+  ];
+
+  function renderGuide() {
+    const items = GUIDE_ITEMS.map(item => `
+      <div class="guide-item">
+        <div class="guide-item-header">
+          <span class="guide-tag ${item.tagClass}">${item.tag}</span>
+          <span class="guide-item-title">${item.title}</span>
+        </div>
+        <p>${item.desc}</p>
+        <span class="action">Action: ${item.action}</span>
+      </div>`).join('');
+
+    return `
+      <div class="guide-card">
+        <div class="guide-header" onclick="toggleGuide()">
+          <span class="guide-title">Analysis Guide — Points of Consideration</span>
+          <span class="guide-toggle" id="guide-toggle-label">Show ▾</span>
+        </div>
+        <div class="guide-body" id="guide-body">
+          <div class="guide-grid">${items}</div>
+        </div>
+      </div>`;
+  }
+
+  function toggleGuide() {
+    const body  = document.getElementById('guide-body');
+    const label = document.getElementById('guide-toggle-label');
+    const open  = body.classList.toggle('open');
+    label.textContent = open ? 'Hide ▴' : 'Show ▾';
+  }
+
+  /* ── Field mismatch grid ─────────────────────────────────────── */
+  function renderFieldGrid(fieldResults, label) {
+    if (!fieldResults || Object.keys(fieldResults).length === 0) return '';
+    const rows = Object.entries(fieldResults)
+      .map(([col, count]) => `
+        <div class="gc">${col}</div>
+        <div class="gc diff-val">${fmt(count)}</div>
+        <div class="gc"></div>`)
+      .join('');
+    return `
+      <h3>${label}</h3>
+      <div class="field-grid">
+        <div class="gh">Column</div><div class="gh">Mismatches</div><div class="gh"></div>
+        ${rows}
+      </div>`;
+  }
+
+  /* ── Deep diff records ───────────────────────────────────────── */
+  function renderDiffRecords(deepDiff) {
+    if (!deepDiff || !deepDiff.diff_records || deepDiff.diff_records.length === 0) return '';
+
+    const records = deepDiff.diff_records.map(rec => {
+      const pkStr = Object.entries(rec.pk).map(([k, v]) => `${k}=${v}`).join(', ');
+      const fieldRows = Object.entries(rec.fields).map(([col, vals]) => `
+        <div class="gc">${col}</div>
+        <div class="gc left-val">${displayVal(vals.left)}</div>
+        <div class="gc right-val">${displayVal(vals.right)}</div>`).join('');
+      return `
+        <div class="diff-record">
+          <div class="diff-record-pk">PK: ${pkStr}</div>
+          <div class="field-grid" style="border:none;border-radius:0">
+            <div class="gh">Field</div>
+            <div class="gh">Left (Source / Teradata)</div>
+            <div class="gh">Right (Target / Fabric)</div>
+            ${fieldRows}
+          </div>
+        </div>`;
+    }).join('');
+
+    const total = deepDiff.total_diff || deepDiff.diff_records.length;
+    const shown = deepDiff.diff_records.length;
+    const caption = total > shown
+      ? `Showing ${shown} of ${fmt(total)} differing records (sample_size limit)`
+      : `${fmt(shown)} differing record(s)`;
+
+    return `<h3 style="margin-top:14px">Deep Diff — ${caption}</h3>
+            <div class="diff-records">${records}</div>`;
+  }
+
+  /* ── Table row detail ────────────────────────────────────────── */
+  function renderDetail(t) {
+    const stats = t.statistics || {};
+    return `
+      <div class="detail-panel">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:14px;font-size:12px">
+          <div><span style="color:var(--muted)">Left total</span><br><strong>${fmt(stats.left_total)}</strong></div>
+          <div><span style="color:var(--muted)">Right total</span><br><strong>${fmt(stats.right_total)}</strong></div>
+          <div><span style="color:var(--muted)">Matched PKs</span><br><strong>${fmt(stats.matched_pk_records)}</strong></div>
+          <div><span style="color:var(--muted)">Identical</span><br><strong>${fmt(stats.identical_records)}</strong></div>
+          <div><span style="color:var(--muted)">Different</span><br><strong class="diff-val">${fmt(stats.different_records)}</strong></div>
+          <div><span style="color:var(--muted)">Left-only PKs</span><br><strong class="diff-val">${fmt(stats.left_unique)}</strong></div>
+          <div><span style="color:var(--muted)">Right-only PKs</span><br><strong class="diff-val">${fmt(stats.right_unique)}</strong></div>
+        </div>
+        ${renderFieldGrid(t.field_results, 'Field Mismatches')}
+        ${renderFieldGrid(t.encoding_mismatches_by_field, 'Encoding Mismatches by Field')}
+        ${renderDiffRecords(t.deep_diff)}
+        ${t.error ? `<div style="color:var(--error);font-size:12px;margin-top:8px">Error: ${t.error}</div>` : ''}
+      </div>`;
+  }
+
+  /* ── Main render ─────────────────────────────────────────────── */
+  function render(report) {
+    const s = report.summary || {};
+    document.getElementById('header-meta').innerHTML =
+      `Generated: ${new Date(report.generated_at).toLocaleString()} &nbsp;|&nbsp; ` +
+      `Profile: <strong>${report.profile}</strong> &nbsp;|&nbsp; ` +
+      `Run ID: <strong>${report.run_id}</strong>`;
+
+    const tiles = `
+      <div class="tiles">
+        <div class="tile"><div class="label">Reports</div><div class="value">${s.total}</div></div>
+        <div class="tile ok"><div class="label">OK</div><div class="value">${s.ok}</div></div>
+        <div class="tile fail"><div class="label">Fail</div><div class="value">${s.fail}</div></div>
+        <div class="tile error"><div class="label">Error</div><div class="value">${s.error}</div></div>
+        <div class="tile"><div class="label">Left Total</div><div class="value" style="font-size:18px">${fmt(s.left_total)}</div></div>
+        <div class="tile"><div class="label">Right Total</div><div class="value" style="font-size:18px">${fmt(s.right_total)}</div></div>
+        <div class="tile fail"><div class="label">Different Records</div><div class="value" style="font-size:18px">${fmt(s.different_records)}</div></div>
+        <div class="tile fail"><div class="label">Encoding Mismatches</div><div class="value" style="font-size:18px">${fmt(s.encoding_mismatches)}</div></div>
+      </div>`;
+
+    const tbody = (report.tables || []).map((t, i) => {
+      const stats = t.statistics || {};
+      const encCount = Object.values(t.encoding_mismatches_by_field || {}).reduce((a, b) => a + b, 0);
+      return `
+        <tr onclick="toggleRow(${i})">
+          <td>${t.left || t.table || '—'}</td>
+          <td>${t.type || 'ducky'}</td>
+          <td>${statusBadge(t.status)}</td>
+          <td class="num">${t.runtime || '—'}</td>
+          <td class="num">${fmt(stats.left_total)}</td>
+          <td class="num">${fmt(stats.right_total)}</td>
+          <td class="num ${stats.left_unique  > 0 ? 'diff-val' : ''}">${fmt(stats.left_unique)}</td>
+          <td class="num ${stats.right_unique > 0 ? 'diff-val' : ''}">${fmt(stats.right_unique)}</td>
+          <td class="num ${stats.different_records > 0 ? 'diff-val' : ''}">${fmt(stats.different_records)}</td>
+          <td class="num ${encCount > 0 ? 'diff-val' : ''}">${fmt(encCount)}</td>
+        </tr>
+        <tr class="detail-row" id="detail-${i}" style="display:none">
+          <td colspan="10">${renderDetail(t)}</td>
+        </tr>`;
+    }).join('');
+
+    const tableHtml = `
+      <div class="card">
+        <div class="card-title">Table Results</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Table</th><th>Type</th><th>Status</th><th>Runtime</th>
+              <th>Left</th><th>Right</th>
+              <th>Left Unique</th><th>Right Unique</th>
+              <th>Diff</th><th>Encoding</th>
+            </tr>
+          </thead>
+          <tbody>${tbody}</tbody>
+        </table>
+      </div>`;
+
+    document.getElementById('app').innerHTML = tiles + renderGuide() + tableHtml;
+  }
+
+  function toggleRow(i) {
+    const row = document.getElementById('detail-' + i);
+    row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+  }
+
+  if (typeof REPORT !== 'undefined') {
+    render(REPORT);
+  }
+</script>
+</body>
+</html>
